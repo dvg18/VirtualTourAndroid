@@ -58,6 +58,13 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_NETWORK_STATE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_NETWORK_STATE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
+        }
+
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -170,21 +177,31 @@ public class MainActivity extends AppCompatActivity {
                 Toast toast = Toast
                         .makeText(this, "Cancelled", Toast.LENGTH_SHORT);
                 toast.show();
-                httpclient client = new httpclient();
-                client.execute();
+                //httpclient client = new httpclient();
+                //client.execute();
 /*
-                String charset = "UTF-8";
                 String requestURL = "http://192.168.0.2/public/";
+                boolean useCSRF = false;
+                MultipartLargeUtility multipart = new MultipartLargeUtility(requestURL, "UTF-8",useCSRF);
+                multipart.addFormField("param1","value");
+                multipart.addFilePart("filefield",new File(mCurrentPhotoPath));
+                multipart.addFilePart("filefield2",new File(mCurrentPhotoPath));
+                List<String> response = multipart.finish();
+                Log.w(TAG,"SERVER REPLIED:");
+                for(String line : response) {
+                    Log.w(TAG, "Upload Files Response:::" + line);
+                }
 
-                MultipartUtility multipart = new MultipartUtility(requestURL, charset);
-                multipart.addFormField("param_name_1", "param_value");
-                multipart.addFormField("param_name_2", "param_value");
-                multipart.addFormField("param_name_3", "param_value");
-                multipart.addFilePart("file_param_1", new File(mCurrentPhotoPath));
-                multipart.addFilePart("file_param_2", new File(mCurrentPhotoPath));
-                String response = multipart.finish(); // response from server.
+                */
 
                 toast = Toast
+                        .makeText(this, mCurrentPhotoPath, Toast.LENGTH_SHORT);
+                toast.show();
+
+                clientRun client = new clientRun();
+                client.execute(mCurrentPhotoPath, mCurrentPhotoPath);
+
+              /*  toast = Toast
                         .makeText(this, response, Toast.LENGTH_SHORT);
                 toast.show();*/
             }
@@ -200,6 +217,8 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
         } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
+        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
         } else {
             Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             File file = new File(Environment.getExternalStorageDirectory(),

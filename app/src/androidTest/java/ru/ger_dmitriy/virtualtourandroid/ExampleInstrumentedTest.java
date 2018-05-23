@@ -1,4 +1,4 @@
-package ru.ger_dmitriy.virtualtourservice;
+package ru.ger_dmitriy.virtualtourandroid;
 
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;

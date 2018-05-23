@@ -1,4 +1,4 @@
-package ru.ger_dmitriy.virtualtourservice;
+package ru.ger_dmitriy.virtualtourandroid;
 
 import org.junit.Test;
 

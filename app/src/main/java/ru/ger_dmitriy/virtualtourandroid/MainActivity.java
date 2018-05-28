@@ -21,6 +21,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -42,9 +43,10 @@ public class MainActivity extends AppCompatActivity {
 
     static final int REQUEST_TAKE_PHOTO = 1;
     String mCurrentPhotoPath;
-
+    String directoryTimeStamp;
+    File storageDir;
     private Uri picUri;
-
+    EditText editText;
     private static int TAKE_PICTURE = 1;
     private static final int PERMISSION_REQUEST = 1;
     private Uri mOutputFileUri;
@@ -54,8 +56,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        mImageView = findViewById(R.id.imageView);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        editText = (EditText) findViewById(R.id.editText);
         setSupportActionBar(toolbar);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
@@ -100,7 +102,12 @@ public class MainActivity extends AppCompatActivity {
     public void onCameraClick(View view) {
         //Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         //startActivityForResult(cameraIntent, CAMERA_RESULT);
+        directoryTimeStamp =
+                new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES.concat("/" + directoryTimeStamp));
         dispatchTakePictureIntent();
+
+
     }
 
     private void dispatchTakePictureIntent() {
@@ -165,18 +172,18 @@ public class MainActivity extends AppCompatActivity {
                         if (data.hasExtra("data")) {
                             Bitmap thumbnailBitmap = data.getParcelableExtra("data");
                             // Какие-то действия с миниатюрой
-                            mImageView.setImageBitmap(thumbnailBitmap);
+                            //mImageView.setImageBitmap(thumbnailBitmap);
                         }
                     } else {
                         // Какие-то действия с полноценным изображением,
                         // сохраненным по адресу mOutputFileUri
-                        mImageView.setImageURI(mOutputFileUri);
+                        //mImageView.setImageURI(mOutputFileUri);
                     }
                 }
             } else {
-                Toast toast = Toast
-                        .makeText(this, "Cancelled", Toast.LENGTH_SHORT);
-                toast.show();
+
+                sendFiles(storageDir);
+
                 //httpclient client = new httpclient();
                 //client.execute();
 /*
@@ -194,12 +201,6 @@ public class MainActivity extends AppCompatActivity {
 
                 */
 
-                toast = Toast
-                        .makeText(this, mCurrentPhotoPath, Toast.LENGTH_SHORT);
-                toast.show();
-
-                clientRun client = new clientRun();
-                client.execute(mCurrentPhotoPath, mCurrentPhotoPath);
 
               /*  toast = Toast
                         .makeText(this, response, Toast.LENGTH_SHORT);
@@ -240,7 +241,7 @@ public class MainActivity extends AppCompatActivity {
     private void handleSmallCameraPhoto(Intent intent) {
         Bundle extras = intent.getExtras();
         mImageBitmap = (Bitmap) extras.get("data");
-        mImageView.setImageBitmap(mImageBitmap);
+        //mImageView.setImageBitmap(mImageBitmap);
     }
 
     private File createImageFile() throws IOException {
@@ -248,7 +249,7 @@ public class MainActivity extends AppCompatActivity {
         String timeStamp =
                 new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String imageFileName = JPEG_FILE_PREFIX + timeStamp + "_";
-        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        //File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES.concat(directoryTimeStamp));
         File image = File.createTempFile(
                 imageFileName,
                 JPEG_FILE_SUFFIX,
@@ -266,6 +267,32 @@ public class MainActivity extends AppCompatActivity {
         this.sendBroadcast(mediaScanIntent);
     }
 
+    private void sendFiles(File path) {
+        Toast toast;
+        String login = editText.getText().toString();
+        if (login.equals("")) {
+            toast = Toast
+                    .makeText(this, "Error! Enter a login", Toast.LENGTH_SHORT);
+            toast.show();
+            return;
+        }
+        Log.d(TAG, "Login: " + login);
+        for (File file : path.listFiles()) {
+            if (file.isFile() && file.length() != 0) {
+                clientRun client = new clientRun();
+                client.execute(login, directoryTimeStamp, file.getAbsolutePath());
+            }
+        }
+        toast = Toast
+                .makeText(this, "files sent successfully", Toast.LENGTH_SHORT);
+        toast.show();
+    }
+
     public void onGalleryClick(View view) {
+
+    }
+
+    public void onSendClick(View view) {
+
     }
 }

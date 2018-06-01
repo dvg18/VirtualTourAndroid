@@ -39,7 +39,7 @@ public class MultipartUtility {
         boundary = "===" + System.currentTimeMillis() + "===";
 
         URL url = new URL(requestURL);
-        Log.d("URL", "URL : " + requestURL.toString());
+        Log.d("URL", "URL : " + requestURL);
         httpConn = (HttpURLConnection) url.openConnection();
         httpConn.setUseCaches(false);
         httpConn.setDoOutput(true); // indicates POST method
@@ -47,7 +47,7 @@ public class MultipartUtility {
         httpConn.setRequestProperty("Content-Type",
                 "multipart/form-data; boundary=" + boundary);
         httpConn.setRequestProperty("User-Agent", "CodeJava Agent");
-        httpConn.setRequestProperty("Test", "Bonjour");
+        //httpConn.setRequestProperty("Test", "Bonjour");
         outputStream = httpConn.getOutputStream();
         writer = new PrintWriter(new OutputStreamWriter(outputStream, charset),
                 true);
@@ -125,7 +125,7 @@ public class MultipartUtility {
      * @throws IOException
      */
     public String finish() throws IOException {
-        StringBuffer response = new StringBuffer();
+        StringBuilder response = new StringBuilder();
 
         writer.append(LINE_FEED).flush();
         writer.append("--" + boundary + "--").append(LINE_FEED);
@@ -133,18 +133,19 @@ public class MultipartUtility {
 
         // checks server's status code first
         int status = httpConn.getResponseCode();
-        if (status == HttpURLConnection.HTTP_OK) {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    httpConn.getInputStream()));
-            String line = null;
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
-            }
-            reader.close();
-            httpConn.disconnect();
-        } else {
+
+        if (status != HttpURLConnection.HTTP_OK) {
             throw new IOException("Server returned non-OK status: " + status);
         }
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(
+                httpConn.getInputStream()));
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            response.append(line);
+        }
+        reader.close();
+        httpConn.disconnect();
 
         return response.toString();
     }

@@ -3,12 +3,14 @@ package ru.ger_dmitriy.virtualtourandroid;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -23,6 +25,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
@@ -31,26 +34,31 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
+import static android.provider.Telephony.Mms.Part.FILENAME;
+
 public class MainActivity extends AppCompatActivity {
 
     private final int CAMERA_RESULT = 0;
-    private ImageView mImageView;
-    private Bitmap mImageBitmap;
     private final String JPEG_FILE_PREFIX = "photo_";
     private final String JPEG_FILE_SUFFIX = ".jpg";
 
-    String TAG = "VT";
+    private String TAG = "VT";
+
+    public static final String APP_PREFERENCES = "settings";
+    public static String APP_PREFERENCES_ADDRESS = "";
+
+    private TextView addressTxtView;
 
     static final int REQUEST_TAKE_PHOTO = 1;
-    String mCurrentPhotoPath;
-    String directoryTimeStamp;
-    File storageDir;
-    private Uri picUri;
-    EditText editText;
-    private static int TAKE_PICTURE = 1;
+    private String mCurrentPhotoPath;
+    private String directoryTimeStamp;
+    private File storageDir;
+    private EditText editText;
     private static final int PERMISSION_REQUEST = 1;
-    private Uri mOutputFileUri;
 
+    private Context mContext;
+
+    private static final String login = LoginActivity.login;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +68,18 @@ public class MainActivity extends AppCompatActivity {
         editText = (EditText) findViewById(R.id.editText);
         setSupportActionBar(toolbar);
 
+        addressTxtView = findViewById(R.id.addressTextView);
+
+        SharedPreferences prefs = PreferenceManager
+                .getDefaultSharedPreferences(this);
+        // читаем установленное значение из
+        APP_PREFERENCES_ADDRESS = prefs.getString("upload_address", "0.0.0.0");
+        Log.d(TAG, "onCreate: " + APP_PREFERENCES_ADDRESS);
+
+        addressTxtView.setText(APP_PREFERENCES_ADDRESS);
+
+        //login = LoginActivity.login;
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
         }
@@ -67,14 +87,25 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_NETWORK_STATE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
         }
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+       /* FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
                         .setAction("Action", null).show();
             }
-        });
+        });*/
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        SharedPreferences prefs = PreferenceManager
+                .getDefaultSharedPreferences(this);
+        // читаем установленное значение из
+        APP_PREFERENCES_ADDRESS = prefs.getString("upload_address", "0.0.0.0");
+        addressTxtView.setText(APP_PREFERENCES_ADDRESS);
+        // Log.d(TAG, "onResume: " + APP_PREFERENCES_ADDRESS);
     }
 
     @Override
@@ -93,24 +124,36 @@ public class MainActivity extends AppCompatActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            Intent intent = new Intent();
+            intent.setClass(this, SettingsActivity.class);
+            startActivity(intent);
             return true;
+        } else if (id == R.id.action_sendAgain) {
+            sendFiles(storageDir);
         }
 
         return super.onOptionsItemSelected(item);
     }
 
     public void onCameraClick(View view) {
-        //Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        //startActivityForResult(cameraIntent, CAMERA_RESULT);
+        //String login = editText.getText().toString();
+
+        if (login.equals("")) {
+            Toast toast = Toast
+                    .makeText(this, "Enter a login!", Toast.LENGTH_SHORT);
+            toast.show();
+            return;
+        }
         directoryTimeStamp =
                 new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES.concat("/" + directoryTimeStamp));
+        storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES.concat("/"
+                + directoryTimeStamp));
         dispatchTakePictureIntent();
-
 
     }
 
     private void dispatchTakePictureIntent() {
+        Toast toast;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
         } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
@@ -118,31 +161,50 @@ public class MainActivity extends AppCompatActivity {
         } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
         } else {
+            if (!isIntentAvailable(this, MediaStore.ACTION_IMAGE_CAPTURE)) {
+                toast = Toast
+                        .makeText(this, "Error! Can't get access to a camera",
+                                Toast.LENGTH_SHORT);
+                toast.show();
+                return;
+            }
             Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             // Ensure that there's a camera activity to handle the intent
-            if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
-                // Create the File where the photo should go
-                File photoFile = null;
-                try {
-                    photoFile = createImageFile();
-                } catch (IOException ex) {
-                    Log.e(TAG, "dispatchTakePictureIntent: Can't create file", ex);
-                    // Error occurred while creating the File
-                }
-                // Continue only if the File was successfully created
-                if (photoFile != null) {
-                    try {
-                        Uri photoURI = FileProvider.getUriForFile(this,
-                                "ru.ger_dmitriy.virtualtourservice",
-                                photoFile);
-                        takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-                        startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
-                    } catch (Exception ex) {
-                        Log.e(TAG, "dispatchTakePictureIntent: Can't start activity", ex);
-                    }
-                }
+            if (takePictureIntent.resolveActivity(getPackageManager()) == null) {
+                toast = Toast
+                        .makeText(this, "Error! Can't get access to a camera activity",
+                                Toast.LENGTH_SHORT);
+                toast.show();
+                return;
+            }
+            // Create the File where the photo should go
+            File photoFile = null;
+            try {
+                photoFile = createImageFile();
+            } catch (IOException ex) {
+                Log.e(TAG, "dispatchTakePictureIntent: Can't create file", ex);
+                // Error occurred while creating the File
+            }
+            // Continue only if the File was successfully created
+            if (photoFile == null) {
+                toast = Toast
+                        .makeText(this, "Error! Can't create temp file",
+                                Toast.LENGTH_SHORT);
+                toast.show();
+                return;
+            }
+            try {
+                Uri photoURI = FileProvider.getUriForFile(this,
+                        "ru.ger_dmitriy.virtualtourservice",
+                        photoFile);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
+                startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
+            } catch (Exception ex) {
+                Log.e(TAG, "dispatchTakePictureIntent: Can't start activity", ex);
             }
         }
+
+
     }
 
     @Override
@@ -156,80 +218,35 @@ public class MainActivity extends AppCompatActivity {
                             .makeText(this, "Photo is created", Toast.LENGTH_SHORT);
                     toast.show();
                     dispatchTakePictureIntent();
-                    //picUri = data.getData();
-                   /* Bundle extras = data.getExtras();
-                    // Получим кадрированное изображение
-                    Bitmap thePic = (Bitmap) extras.get("data");
-                    //Bitmap thePic = extras.getParcelable("data");
-                    // передаём его в ImageView
-                    mImageView.setImageBitmap(thePic);
-                    // Bitmap thumbnailBitmap = (Bitmap) data.getExtras().get("data");
-                    //mImageView.setImageBitmap(thumbnailBitmap);*/
-                }
-                if (requestCode == TAKE_PICTURE) {
-                    // Проверяем, содержит ли результат маленькую картинку
-                    if (data != null) {
-                        if (data.hasExtra("data")) {
-                            Bitmap thumbnailBitmap = data.getParcelableExtra("data");
-                            // Какие-то действия с миниатюрой
-                            //mImageView.setImageBitmap(thumbnailBitmap);
-                        }
-                    } else {
-                        // Какие-то действия с полноценным изображением,
-                        // сохраненным по адресу mOutputFileUri
-                        //mImageView.setImageURI(mOutputFileUri);
-                    }
                 }
             } else {
-
                 sendFiles(storageDir);
-
-                //httpclient client = new httpclient();
-                //client.execute();
-/*
-                String requestURL = "http://192.168.0.2/public/";
-                boolean useCSRF = false;
-                MultipartLargeUtility multipart = new MultipartLargeUtility(requestURL, "UTF-8",useCSRF);
-                multipart.addFormField("param1","value");
-                multipart.addFilePart("filefield",new File(mCurrentPhotoPath));
-                multipart.addFilePart("filefield2",new File(mCurrentPhotoPath));
-                List<String> response = multipart.finish();
-                Log.w(TAG,"SERVER REPLIED:");
-                for(String line : response) {
-                    Log.w(TAG, "Upload Files Response:::" + line);
-                }
-
-                */
-
-
-              /*  toast = Toast
-                        .makeText(this, response, Toast.LENGTH_SHORT);
-                toast.show();*/
             }
         } catch (Exception ex) {
             Log.e(TAG, "onActivityResult: ", ex);
         }
     }
 
-    private void saveFullImage() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
-        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
-        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
-        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
-        } else {
-            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            File file = new File(Environment.getExternalStorageDirectory(),
-                    "test.jpg");
-            //mOutputFileUri = FileProvider.fromFile(file);
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, mCurrentPhotoPath);
-            startActivityForResult(intent, TAKE_PICTURE);
+    /*
+        private void saveFullImage() {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
+            } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
+            } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
+            } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.INTERNET}, PERMISSION_REQUEST);//выводит диалог, где пользователю предоставляется выбор
+            } else {
+                Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                File file = new File(Environment.getExternalStorageDirectory(),
+                        "test.jpg");
+                //mOutputFileUri = FileProvider.fromFile(file);
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, mCurrentPhotoPath);
+                startActivityForResult(intent, TAKE_PICTURE);
+            }
         }
-    }
-
+    */
     public static boolean isIntentAvailable(Context context, String action) {
         final PackageManager packageManager = context.getPackageManager();
         final Intent intent = new Intent(action);
@@ -237,12 +254,12 @@ public class MainActivity extends AppCompatActivity {
                 packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
         return list.size() > 0;
     }
-
+/*
     private void handleSmallCameraPhoto(Intent intent) {
         Bundle extras = intent.getExtras();
         mImageBitmap = (Bitmap) extras.get("data");
         //mImageView.setImageBitmap(mImageBitmap);
-    }
+    }*/
 
     private File createImageFile() throws IOException {
         // Create an image file name
@@ -258,18 +275,25 @@ public class MainActivity extends AppCompatActivity {
         mCurrentPhotoPath = image.getAbsolutePath();
         return image;
     }
-
+/*
     private void galleryAddPic() {
         Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
         File f = new File(mCurrentPhotoPath);
         Uri contentUri = Uri.fromFile(f);
         mediaScanIntent.setData(contentUri);
         this.sendBroadcast(mediaScanIntent);
-    }
+    }*/
 
     private void sendFiles(File path) {
         Toast toast;
-        String login = editText.getText().toString();
+        if (path == null) {
+            toast = Toast
+                    .makeText(this, "Error! No files", Toast.LENGTH_SHORT);
+            toast.show();
+            return;
+        }
+
+        //String login = editText.getText().toString();
         if (login.equals("")) {
             toast = Toast
                     .makeText(this, "Error! Enter a login", Toast.LENGTH_SHORT);
@@ -277,19 +301,23 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Log.d(TAG, "Login: " + login);
+        mContext = this;
+        int count = path.listFiles().length;
+       /* toast = Toast
+                .makeText(this, "Count " + count, Toast.LENGTH_SHORT);
+        toast.show();*/
         for (File file : path.listFiles()) {
             if (file.isFile() && file.length() != 0) {
-                clientRun client = new clientRun();
-                client.execute(login, directoryTimeStamp, file.getAbsolutePath());
+                clientRun client = new clientRun(mContext);
+                client.execute(APP_PREFERENCES_ADDRESS, login, directoryTimeStamp, file.getAbsolutePath());
             }
         }
-        toast = Toast
-                .makeText(this, "files sent successfully", Toast.LENGTH_SHORT);
-        toast.show();
     }
 
     public void onGalleryClick(View view) {
-
+        Intent intent = new Intent();
+        intent.setClass(this, LoginActivity.class);
+        startActivity(intent);
     }
 
     public void onSendClick(View view) {

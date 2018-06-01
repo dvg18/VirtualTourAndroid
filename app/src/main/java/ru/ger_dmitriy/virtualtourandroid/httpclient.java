@@ -104,8 +104,8 @@ public class httpclient extends AsyncTask<Void, Void, Void> {
     @Override
     protected Void doInBackground(Void... params) {
         try {
-            String myURL = "http://192.168.0.2/public/";
-            String parammetrs = "param1=1&param2=XXX";
+            String myURL = "http://192.168.0.2/login/";
+            String parammetrs = "login=admin&password=admin";
             byte[] data = null;
             InputStream is = null;
 
@@ -141,6 +141,7 @@ public class httpclient extends AsyncTask<Void, Void, Void> {
                     data = baos.toByteArray();
                     resultString = new String(data, "UTF-8");
                 } else {
+                    ;
                 }
 
 

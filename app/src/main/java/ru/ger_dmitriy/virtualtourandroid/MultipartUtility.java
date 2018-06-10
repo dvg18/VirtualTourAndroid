@@ -41,13 +41,13 @@ public class MultipartUtility {
         URL url = new URL(requestURL);
         Log.d("URL", "URL : " + requestURL);
         httpConn = (HttpURLConnection) url.openConnection();
+        httpConn.setRequestMethod("POST");
         httpConn.setUseCaches(false);
-        httpConn.setDoOutput(true); // indicates POST method
+        httpConn.setDoOutput(true);
         httpConn.setDoInput(true);
         httpConn.setRequestProperty("Content-Type",
                 "multipart/form-data; boundary=" + boundary);
         httpConn.setRequestProperty("User-Agent", "CodeJava Agent");
-        //httpConn.setRequestProperty("Test", "Bonjour");
         outputStream = httpConn.getOutputStream();
         writer = new PrintWriter(new OutputStreamWriter(outputStream, charset),
                 true);

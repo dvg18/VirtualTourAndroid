@@ -1,6 +1,9 @@
 package ru.ger_dmitriy.virtualtourandroid;
 
 import android.Manifest;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -8,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.preference.PreferenceManager;
@@ -25,10 +29,13 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -38,23 +45,19 @@ import static android.provider.Telephony.Mms.Part.FILENAME;
 
 public class MainActivity extends AppCompatActivity {
 
-    private final int CAMERA_RESULT = 0;
     private final String JPEG_FILE_PREFIX = "photo_";
     private final String JPEG_FILE_SUFFIX = ".jpg";
-
+    public static String APP_PREFERENCES_ADDRESS = "";
+    private static final int PERMISSION_REQUEST = 1;
+    private static final int REQUEST_TAKE_PHOTO = 1;
     private String TAG = "VT";
 
-    public static final String APP_PREFERENCES = "settings";
-    public static String APP_PREFERENCES_ADDRESS = "";
-
     private TextView addressTxtView;
-
-    static final int REQUEST_TAKE_PHOTO = 1;
-    private String mCurrentPhotoPath;
+    private static ProgressBar mProgressBar;
+    //private String mCurrentPhotoPath;
     private String directoryTimeStamp;
     private File storageDir;
-    private EditText editText;
-    private static final int PERMISSION_REQUEST = 1;
+    //private EditText editText;
 
     private Context mContext;
 
@@ -65,10 +68,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-        editText = (EditText) findViewById(R.id.editText);
+        //editText = (EditText) findViewById(R.id.editText);
         setSupportActionBar(toolbar);
 
         addressTxtView = findViewById(R.id.addressTextView);
+        mProgressBar = findViewById(R.id.login_progress_main);
 
         SharedPreferences prefs = PreferenceManager
                 .getDefaultSharedPreferences(this);
@@ -129,12 +133,16 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
             return true;
         } else if (id == R.id.action_sendAgain) {
-            sendFiles(storageDir);
+            sendFiles(storageDir, false); //don't compress again
         }
 
         return super.onOptionsItemSelected(item);
     }
 
+    /**
+     *
+     * @param view
+     */
     public void onCameraClick(View view) {
         //String login = editText.getText().toString();
 
@@ -152,6 +160,9 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    /**
+     *
+     */
     private void dispatchTakePictureIntent() {
         Toast toast;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -207,6 +218,12 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    /**
+     *
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         //super.onActivityResult(requestCode, resultCode, data);
@@ -220,7 +237,7 @@ public class MainActivity extends AppCompatActivity {
                     dispatchTakePictureIntent();
                 }
             } else {
-                sendFiles(storageDir);
+                sendFiles(storageDir, true);
             }
         } catch (Exception ex) {
             Log.e(TAG, "onActivityResult: ", ex);
@@ -247,6 +264,13 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     */
+
+    /**
+     *
+     * @param context
+     * @param action
+     * @return
+     */
     public static boolean isIntentAvailable(Context context, String action) {
         final PackageManager packageManager = context.getPackageManager();
         final Intent intent = new Intent(action);
@@ -261,6 +285,11 @@ public class MainActivity extends AppCompatActivity {
         //mImageView.setImageBitmap(mImageBitmap);
     }*/
 
+    /**
+     *
+     * @return
+     * @throws IOException
+     */
     private File createImageFile() throws IOException {
         // Create an image file name
         String timeStamp =
@@ -272,7 +301,7 @@ public class MainActivity extends AppCompatActivity {
                 JPEG_FILE_SUFFIX,
                 storageDir
         );
-        mCurrentPhotoPath = image.getAbsolutePath();
+        //mCurrentPhotoPath = image.getAbsolutePath();
         return image;
     }
 /*
@@ -284,7 +313,11 @@ public class MainActivity extends AppCompatActivity {
         this.sendBroadcast(mediaScanIntent);
     }*/
 
-    private void sendFiles(File path) {
+    /**
+     * @param path
+     * @param needCompression
+     */
+    private void sendFiles(File path, boolean needCompression) {
         Toast toast;
         if (path == null) {
             toast = Toast
@@ -302,25 +335,63 @@ public class MainActivity extends AppCompatActivity {
         }
         Log.d(TAG, "Login: " + login);
         mContext = this;
-        int count = path.listFiles().length;
+        //int count = path.listFiles().length;//
+        int i = 0;
+        int j = 0;
+        String flag = "";
        /* toast = Toast
                 .makeText(this, "Count " + count, Toast.LENGTH_SHORT);
         toast.show();*/
+        if (path.listFiles().length == 0)
+            return;
+
         for (File file : path.listFiles()) {
             if (file.isFile() && file.length() != 0) {
-                clientRun client = new clientRun(mContext);
-                client.execute(APP_PREFERENCES_ADDRESS, login, directoryTimeStamp, file.getAbsolutePath());
+                i++;    //looking for a number of the last file
+            }
+        }
+        if (i == 0) // if number of not-null files != 0
+            return;
+        showProgress(true);
+        if (needCompression) {
+            for (File file : path.listFiles()) {
+                if (file.isFile() && file.length() != 0) {
+                    j++;
+                    if (j == i) flag = "+"; //if the last file sent signal
+                    compressFile compress = new compressFile(mContext);
+                    compress.execute(file.getAbsolutePath(), flag);
+                }
+            }
+        }
+        j = 0;
+        flag = "";
+        for (File file : path.listFiles()) {
+            if (file.isFile() && file.length() != 0) {
+                j++;
+                if (j == i) flag = "+"; //if the last file sent signal
+                sendFile client = new sendFile(mContext);
+                client.execute(APP_PREFERENCES_ADDRESS, login, directoryTimeStamp,
+                        file.getAbsolutePath(), flag);
             }
         }
     }
 
     public void onGalleryClick(View view) {
-        Intent intent = new Intent();
-        intent.setClass(this, LoginActivity.class);
-        startActivity(intent);
+
     }
 
     public void onSendClick(View view) {
 
+    }
+
+    /**
+     * Shows the progress UI and hides the login form.
+     * @param show
+     */
+    public static void showProgress(final boolean show) {
+        // The ViewPropertyAnimator APIs are not available, so simply show
+        // and hide the relevant UI components.
+        mProgressBar.setVisibility(show ? ProgressBar.VISIBLE : ProgressBar.GONE);
+        //mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
     }
 }
